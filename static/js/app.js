@@ -8,6 +8,7 @@ const feedGrid = document.getElementById('feed-grid');
 const searchInput = document.getElementById('search-input');
 const filterTags = document.querySelectorAll('.filter-tag');
 const btnRefresh = document.getElementById('btn-refresh');
+const btnExportCSV = document.getElementById('btn-export-csv');
 const statsCount = document.getElementById('stats-count');
 const emptyState = document.getElementById('empty-state');
 const btnResetFilters = document.getElementById('btn-reset-filters');
@@ -28,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initApp() {
+  // Initialize Theme (Dark/Light mode)
+  initTheme();
+
   // Fetch notes on load
   fetchNotes(false);
 
@@ -51,6 +55,9 @@ function initApp() {
   btnRefresh.addEventListener('click', () => {
     fetchNotes(true);
   });
+
+  // Export CSV click
+  btnExportCSV.addEventListener('click', exportToCSV);
 
   // Reset Filters click
   btnResetFilters.addEventListener('click', () => {
@@ -274,12 +281,22 @@ function createCardElement(note, index) {
         </svg>
       </a>
       
-      <button class="btn-card-tweet" title="Select and Tweet about this update">
-        <svg class="icon-twitter" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-        </svg>
-        Tweet
-      </button>
+      <div class="card-actions-right">
+        <button class="btn-card-copy" title="Copy release note text to clipboard">
+          <svg class="icon icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copy
+        </button>
+        
+        <button class="btn-card-tweet" title="Select and Tweet about this update">
+          <svg class="icon-twitter" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          Tweet
+        </button>
+      </div>
     </footer>
   `;
 
@@ -294,6 +311,12 @@ function createCardElement(note, index) {
       body.classList.add('expanded');
       readMoreBtn.textContent = 'Show Less';
     }
+  });
+
+  // Attach event listener for "Copy" click
+  const copyBtn = card.querySelector('.btn-card-copy');
+  copyBtn.addEventListener('click', () => {
+    copyToClipboard(note, copyBtn);
   });
 
   // Attach event listener for "Tweet" click
@@ -390,3 +413,118 @@ style.textContent = `
 }
 `;
 document.head.appendChild(style);
+
+// Copies plain-text release note information to clipboard
+async function copyToClipboard(note, copyBtn) {
+  const textToCopy = `BigQuery Release Note [${note.date}] (${note.category}):\n${note.plain_text}\nSource: ${note.link}`;
+  try {
+    await navigator.clipboard.writeText(textToCopy);
+    copyBtn.classList.add('copied');
+    const originalContent = copyBtn.innerHTML;
+    copyBtn.innerHTML = `
+      <svg class="icon icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      Copied!
+    `;
+    showToast('Copied release note to clipboard!', 'success');
+    setTimeout(() => {
+      copyBtn.classList.remove('copied');
+      copyBtn.innerHTML = originalContent;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy text: ', err);
+    showToast('Failed to copy to clipboard.', 'error');
+  }
+}
+
+// Exports currently filtered release notes to a CSV file
+function exportToCSV() {
+  const filtered = notesState.filter(note => {
+    const catMatch = activeCategory === 'all' || 
+                     note.category.toLowerCase() === activeCategory.toLowerCase();
+    const searchMatch = !searchQuery || 
+                        note.date.toLowerCase().includes(searchQuery) ||
+                        note.category.toLowerCase().includes(searchQuery) ||
+                        note.plain_text.toLowerCase().includes(searchQuery);
+    return catMatch && searchMatch;
+  });
+
+  if (filtered.length === 0) {
+    showToast('No updates found to export.', 'error');
+    return;
+  }
+
+  const headers = ['ID', 'Date', 'Category', 'Plain Text', 'Link'];
+  
+  const escapeCSV = (text) => {
+    if (text === null || text === undefined) return '';
+    let stringVal = String(text);
+    stringVal = stringVal.replace(/"/g, '""');
+    if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n') || stringVal.includes('\r')) {
+      return `"${stringVal}"`;
+    }
+    return stringVal;
+  };
+
+  const csvRows = [];
+  csvRows.push(headers.join(','));
+
+  for (const note of filtered) {
+    const row = [
+      note.id,
+      note.date,
+      note.category,
+      note.plain_text,
+      note.link
+    ];
+    csvRows.push(row.map(escapeCSV).join(','));
+  }
+
+  const csvString = csvRows.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  
+  const catFilename = activeCategory === 'all' ? 'all' : activeCategory.toLowerCase();
+  const searchFilename = searchQuery ? `_search_${searchQuery.substring(0, 10).replace(/[^a-z0-9]/gi, '_')}` : '';
+  const dateStr = new Date().toISOString().split('T')[0];
+  link.setAttribute('download', `bigquery_release_notes_${catFilename}${searchFilename}_${dateStr}.csv`);
+  
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast(`Successfully exported ${filtered.length} notes to CSV!`, 'success');
+}
+
+// Light / Dark Theme state management
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  setTheme(savedTheme);
+
+  const themeToggleBtn = document.getElementById('theme-toggle');
+  themeToggleBtn.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+  });
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+
+  const darkIcon = document.getElementById('theme-toggle-dark-icon');
+  const lightIcon = document.getElementById('theme-toggle-light-icon');
+
+  if (theme === 'light') {
+    darkIcon.classList.add('hidden');
+    lightIcon.classList.remove('hidden');
+  } else {
+    lightIcon.classList.add('hidden');
+    darkIcon.classList.remove('hidden');
+  }
+}
