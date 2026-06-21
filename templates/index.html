@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery Release Notes Hub</title>
+  <meta name="description" content="Track, filter, and share the latest Google Cloud BigQuery release updates.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <!-- Modern Inter & Outfit fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <!-- Background decorative glows -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h1>BigQuery Release Notes</h1>
+          <p class="subtitle">Track, filter, and share the latest Google Cloud BigQuery updates instantly</p>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button id="btn-refresh" class="btn btn-primary" title="Refresh Release Notes">
+          <svg class="icon icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span class="btn-text">Refresh Feed</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Controls panel: Search, filters and stats -->
+    <section class="controls-panel">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="search" id="search-input" placeholder="Search updates by keyword..." aria-label="Search updates">
+      </div>
+
+      <div class="filters-wrapper">
+        <span class="filter-label">Filter by type:</span>
+        <div class="filter-tags" role="group" aria-label="Categories">
+          <button class="filter-tag active" data-category="all">All</button>
+          <button class="filter-tag" data-category="feature">Features</button>
+          <button class="filter-tag" data-category="announcement">Announcements</button>
+          <button class="filter-tag" data-category="issue">Issues</button>
+          <button class="filter-tag" data-category="deprecation">Deprecations</button>
+          <button class="filter-tag" data-category="general">General</button>
+        </div>
+      </div>
+      
+      <div class="stats-wrapper">
+        <span id="stats-count">0 updates loaded</span>
+      </div>
+    </section>
+
+    <!-- Main Feed -->
+    <main id="feed-container">
+      <!-- Grid for cards -->
+      <div id="feed-grid" class="feed-grid">
+        <!-- Skeleton loaders will be inserted here initially -->
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+      
+      <!-- Empty state -->
+      <div id="empty-state" class="empty-state hidden">
+        <span class="empty-icon">🔍</span>
+        <h3>No matching updates found</h3>
+        <p>Try refining your search keyword or selecting a different category filter.</p>
+        <button id="btn-reset-filters" class="btn btn-secondary">Clear Filters</button>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      <p>&copy; 2026 BigQuery Release Notes Hub. Powered by Python Flask &amp; Google Cloud Feeds.</p>
+    </footer>
+  </div>
+
+  <!-- Share/Tweet Modal -->
+  <dialog id="tweet-modal" closedby="any" aria-labelledby="modal-title">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h2 id="modal-title">
+          <svg class="x-logo-inline" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          Share on Twitter / X
+        </h2>
+        <button id="btn-close-modal" class="btn-close" aria-label="Close dialog">&times;</button>
+      </header>
+
+      <main class="modal-body">
+        <label for="tweet-textarea" class="input-label">Compose your tweet</label>
+        <div class="textarea-wrapper">
+          <textarea id="tweet-textarea" rows="5" maxlength="400" placeholder="What's happening?"></textarea>
+          <div class="textarea-footer">
+            <span id="char-counter">0 / 280</span>
+          </div>
+        </div>
+
+        <div class="tweet-preview-container">
+          <span class="preview-label">Preview Draft</span>
+          <div class="tweet-preview-card">
+            <div class="tweet-user-meta">
+              <div class="avatar">⚡</div>
+              <div>
+                <span class="display-name">Cloud Explorer</span>
+                <span class="username">@cloud_tracker</span>
+              </div>
+            </div>
+            <div id="tweet-preview-text" class="tweet-preview-text"></div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="modal-footer">
+        <button id="btn-modal-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="btn-modal-tweet" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="icon">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          Post Tweet
+        </button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- Toast notification system -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
